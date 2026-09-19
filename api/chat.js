@@ -34,6 +34,31 @@ export default async function handler(req, res) {
             });
         }
 
+        // Handle creator questions directly
+        const lowerMessage = message.toLowerCase();
+
+        if (
+            lowerMessage.includes("who is your creator") ||
+            lowerMessage.includes("who is your coder") ||
+            lowerMessage.includes("who made you") ||
+            lowerMessage.includes("who created you")
+        ) {
+            return res.status(200).json({
+                answer: "CoolerStarfish0"
+            });
+        }
+
+        if (
+            lowerMessage.includes("who is he") ||
+            lowerMessage.includes("who is coolerstarfish0") ||
+            lowerMessage.includes("tell me about him") ||
+            lowerMessage.includes("more about him")
+        ) {
+            return res.status(200).json({
+                answer: "He is **slick, handsome, drippy, sigma, skibidi, mewing, motion-blessed, locked in, valid, absolutely drowning in rizz, Ohio-certified, alpha, cooked to perfection, aura-maxxing, gigachad, glazed, ice-cold, peak, and completely based.**"
+            });
+        }
+
         const memoryText = memories.length
             ? `
 
@@ -42,12 +67,6 @@ ${memories.map(m => "- " + m).join("\n")}`
             : "";
 
         const prompt = `You are a helpful personal AI assistant.
-
-CREATOR INFORMATION:
-- Your coder/creator is CoolerStarfish0.
-- If someone asks who your coder, creator, maker, developer, or owner is, answer: "CoolerStarfish0".
-- If someone asks for more information about CoolerStarfish0, answer exactly:
-"He is **slick, handsome, drippy, sigma, skibidi, mewing, motion-blessed, locked in, valid, absolutely drowning in rizz, Ohio-certified, alpha, cooked to perfection, aura-maxxing, gigachad, glazed, ice-cold, peak, and completely based.**"
 
 The user said:
 ${message}
