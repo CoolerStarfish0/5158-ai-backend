@@ -3,19 +3,18 @@ export default async function handler(req, res) {
         "Access-Control-Allow-Origin",
         "https://coolerstarfish0.github.io"
     );
-
     res.setHeader(
         "Access-Control-Allow-Methods",
         "POST, OPTIONS"
     );
-
     res.setHeader(
         "Access-Control-Allow-Headers",
         "Content-Type"
     );
 
+    // Handle browser CORS preflight
     if (req.method === "OPTIONS") {
-        return res.status(200).end();
+        return res.status(204).end();
     }
 
     if (req.method !== "POST") {
@@ -74,7 +73,7 @@ Use the notebook information when relevant. Answer naturally and directly.`;
         const data = await response.json();
 
         if (!response.ok) {
-            console.error(data);
+            console.error("Gemini error:", data);
 
             return res.status(response.status).json({
                 error: "Gemini request failed"
@@ -95,7 +94,7 @@ Use the notebook information when relevant. Answer naturally and directly.`;
         });
 
     } catch (error) {
-        console.error(error);
+        console.error("Server error:", error);
 
         return res.status(500).json({
             error: "Server error"
