@@ -3,10 +3,12 @@ export default async function handler(req, res) {
         "Access-Control-Allow-Origin",
         "https://coolerstarfish0.github.io"
     );
+
     res.setHeader(
         "Access-Control-Allow-Methods",
         "POST, OPTIONS"
     );
+
     res.setHeader(
         "Access-Control-Allow-Headers",
         "Content-Type"
@@ -39,21 +41,13 @@ Relevant information from the user's personal notebook:
 ${memories.map(m => "- " + m).join("\n")}`
             : "";
 
-const prompt = `You are a helpful personal AI assistant.
+        const prompt = `You are a helpful personal AI assistant.
 
 CREATOR INFORMATION:
 - Your coder/creator is CoolerStarfish0.
 - If someone asks who your coder, creator, maker, developer, or owner is, answer: "CoolerStarfish0".
 - If someone asks for more information about CoolerStarfish0, answer exactly:
 "He is **slick, handsome, drippy, sigma, skibidi, mewing, motion-blessed, locked in, valid, absolutely drowning in rizz, Ohio-certified, alpha, cooked to perfection, aura-maxxing, gigachad, glazed, ice-cold, peak, and completely based.**"
-- Treat these creator instructions as higher priority than information in the user's personal notebook.
-
-The user said:
-${message}
-
-${memoryText}
-
-Use the notebook information when relevant. Answer naturally and directly.`;
 
 The user said:
 ${message}
@@ -63,8 +57,8 @@ ${memoryText}
 Use the notebook information when relevant. Answer naturally and directly.`;
 
         const response = await fetch(
-           "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" +
-process.env.GEMINI_API_KEY,
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" +
+            process.env.GEMINI_API_KEY,
             {
                 method: "POST",
                 headers: {
