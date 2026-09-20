@@ -105,11 +105,11 @@ Answer the user's message now.
          * Put the models you want to use here.
          * The first available model gets the request.
          */
-        const models = [
-            "MODEL_1_HERE",
-            "MODEL_2_HERE",
-            "MODEL_3_HERE"
-        ];
+const models = [
+  "qwen/qwen3.8-27b:free",
+  "google/gemma-4-26b-a4b-it:free",
+  "google/gemma-4-31b-it:free"
+];
 
         let lastError = null;
 
