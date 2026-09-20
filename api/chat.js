@@ -100,12 +100,12 @@ Answer the user's message now.
 `;
 
         // OpenRouter fallback models
-        const models = [
-            "qwen/qwen3.8-27b:free",
-            "google/gemma-4-26b-a4b-it:free",
-            "google/gemma-4-31b-it:free"
-        ];
-
+const models = [
+    "qwen/qwen3.8-27b:free",
+    "z-ai/glm-5.2:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "google/gemma-4-31b-it:free"
+];
         let lastError = null;
 
         for (const model of models) {
