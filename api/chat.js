@@ -186,9 +186,10 @@ const models = [
             lastError
         );
 
-        return res.status(503).json({
-            error: "All AI models are currently unavailable"
-        });
+return res.status(503).json({
+  error: "All OpenRouter models failed",
+  details: errors
+});
 
     } catch (error) {
         console.error("Server error:", error);
