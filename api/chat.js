@@ -15,7 +15,7 @@ export default async function handler(req, res) {
         "Content-Type"
     );
 
-    // Handle browser CORS preflight
+    // Browser CORS preflight
     if (req.method === "OPTIONS") {
         return res.status(204).end();
     }
@@ -35,34 +35,31 @@ export default async function handler(req, res) {
             });
         }
 
-        // Turn the AI's learned knowledge into a controlled notebook.
+        if (!process.env.OPENROUTER_API_KEY) {
+            return res.status(500).json({
+                error: "OpenRouter API key is not configured"
+            });
+        }
+
+        // Turn learned knowledge into the AI's notebook.
         const knowledgeText = memories.length
             ? memories
                 .map((memory, index) => `${index + 1}. ${memory}`)
                 .join("\n")
             : "NO KNOWLEDGE HAS BEEN TAUGHT YET.";
 
-        /*
-         * IMPORTANT:
-         *
-         * Gemini is being used here as the language engine.
-         * The notebook is supposed to be the AI's source of knowledge.
-         *
-         * The model is explicitly told NOT to use its pretrained
-         * knowledge to answer factual questions.
-         */
         const prompt = `
-You are a learning AI.
+You are 5158, a learning AI.
 
-Your knowledge is LIMITED to the information contained in the
-"TAUGHT KNOWLEDGE" section below.
+Your factual knowledge is LIMITED to the information contained
+in the "TAUGHT KNOWLEDGE" section below.
 
-You already have the ability to understand English, understand
-questions, reason about the information you have been given, and
-have natural conversations.
+You can understand English, understand questions, reason about
+information you have been given, and have natural conversations.
 
-However, you MUST NOT use your pretrained/world knowledge to provide
-facts that are not contained in the taught knowledge.
+However, you MUST NOT use your pretrained/world knowledge to
+provide factual information that is not contained in the taught
+knowledge.
 
 TAUGHT KNOWLEDGE:
 ${knowledgeText}
@@ -83,8 +80,8 @@ RULES:
 4. If the answer cannot be determined from the taught knowledge,
    say that you don't know yet.
 
-5. Do NOT fill missing information with information you already knew
-   before this conversation.
+5. Do NOT fill missing information with information you already
+   knew before this conversation.
 
 6. Do NOT pretend to know something that has not been taught.
 
@@ -93,59 +90,104 @@ RULES:
 
 8. Keep responses natural and conversational.
 
-9. If the user asks something like "what do you know?", describe
-   only information contained in the taught knowledge.
+9. If the user asks "what do you know?", describe only information
+   contained in the taught knowledge.
 
 10. Your ability to understand English is separate from your factual
-    knowledge. You can understand a question even if you don't know
-    its answer.
+    knowledge.
 
 Answer the user's message now.
 `;
 
-        const response = await fetch(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" +
-            process.env.GEMINI_API_KEY,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    contents: [
-                        {
-                            parts: [
+        /*
+         * OpenRouter models.
+         *
+         * Put the models you want to use here.
+         * The first available model gets the request.
+         */
+        const models = [
+            "MODEL_1_HERE",
+            "MODEL_2_HERE",
+            "MODEL_3_HERE"
+        ];
+
+        let lastError = null;
+
+        for (const model of models) {
+            try {
+                const response = await fetch(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization":
+                                `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                            "HTTP-Referer":
+                                "https://coolerstarfish0.github.io/my-ai/",
+                            "X-Title": "5158 AI"
+                        },
+                        body: JSON.stringify({
+                            model: model,
+                            messages: [
                                 {
-                                    text: prompt
+                                    role: "user",
+                                    content: prompt
                                 }
                             ]
-                        }
-                    ]
-                })
+                        })
+                    }
+                );
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    console.error(
+                        `OpenRouter model ${model} failed:`,
+                        data
+                    );
+
+                    lastError = data;
+
+                    // Try the next model.
+                    continue;
+                }
+
+                const answer =
+                    data.choices?.[0]?.message?.content;
+
+                if (!answer) {
+                    lastError = {
+                        error: "Model returned no answer"
+                    };
+                    continue;
+                }
+
+                return res.status(200).json({
+                    answer: answer,
+                    model: model
+                });
+
+            } catch (error) {
+                console.error(
+                    `Error using model ${model}:`,
+                    error
+                );
+
+                lastError = error;
+
+                // Try the next model.
+                continue;
             }
+        }
+
+        console.error(
+            "All OpenRouter models failed:",
+            lastError
         );
 
-        const data = await response.json();
-
-        if (!response.ok) {
-            console.error("Gemini error:", data);
-
-            return res.status(response.status).json({
-                error: "Gemini request failed"
-            });
-        }
-
-        const answer =
-            data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-        if (!answer) {
-            return res.status(500).json({
-                error: "Gemini returned no answer"
-            });
-        }
-
-        return res.status(200).json({
-            answer: answer
+        return res.status(503).json({
+            error: "All AI models are currently unavailable"
         });
 
     } catch (error) {
