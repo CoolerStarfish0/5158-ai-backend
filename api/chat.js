@@ -182,10 +182,11 @@ Answer the user's message now.
             lastError
         );
 
-        return res.status(503).json({
-            error: "All OpenRouter models failed",
-            details: lastError
-        });
+return res.status(503).json({
+    error: "All OpenRouter models failed",
+    details: lastError,
+    message: lastError?.error?.message || lastError?.message || "Unknown OpenRouter error"
+});
 
     } catch (error) {
         console.error("Server error:", error);
