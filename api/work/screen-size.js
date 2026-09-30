@@ -1,78 +1,129 @@
-const admin = require("firebase-admin");
+export default async function handler(req, res) {
+    // CORS
+    res.setHeader(
+        "Access-Control-Allow-Origin",
+        "https://coolerstarfish0.github.io"
+    );
 
-function initFirebase() {
-  if (!admin.apps.length) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-      }),
-    });
-  }
-}
+    res.setHeader(
+        "Access-Control-Allow-Methods",
+        "GET, OPTIONS"
+    );
 
-function cors(res) {
-  res.setHeader(
-    "Access-Control-Allow-Origin",
-    "https://coolerstarfish0.github.io"
-  );
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
-  );
-}
+    res.setHeader(
+        "Access-Control-Allow-Headers",
+        "Authorization, Content-Type"
+    );
 
-module.exports = async (req, res) => {
-  cors(res);
-
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
-  }
-
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  try {
-    initFirebase();
-
-    const authHeader = req.headers.authorization || "";
-
-    if (!authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({
-        error: "Missing authentication token",
-      });
+    if (req.method === "OPTIONS") {
+        return res.status(204).end();
     }
 
-    const token = authHeader.slice(7);
-    await admin.auth().verifyIdToken(token);
-
-    const localAIUrl = process.env.LOCAL_AI_URL;
-    const localAISecret = process.env.LOCAL_AI_SECRET;
-
-    if (!localAIUrl || !localAISecret) {
-      return res.status(500).json({
-        error: "Local AI configuration is missing",
-      });
+    if (req.method !== "GET") {
+        return res.status(405).json({
+            error: "Method not allowed"
+        });
     }
 
-    const response = await fetch(`${localAIUrl}/api/work/screen-size`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${localAISecret}`,
-      },
-    });
+    try {
+        const authHeader =
+            req.headers.authorization || "";
 
-    const data = await response.json();
+        if (!authHeader.startsWith("Bearer ")) {
+            return res.status(401).json({
+                error: "Missing authentication."
+            });
+        }
 
-    return res.status(response.status).json(data);
-  } catch (error) {
-    console.error("Screen size error:", error);
+        const idToken =
+            authHeader.substring(7);
 
-    return res.status(500).json({
-      error: "Failed to get screen size",
-    });
-  }
-};
+        if (!idToken) {
+            return res.status(401).json({
+                error: "Missing authentication token."
+            });
+        }
+
+        const localAIUrl =
+            process.env.LOCAL_AI_URL;
+
+        const localAISecret =
+            process.env.LOCAL_AI_SECRET;
+
+        if (!localAIUrl) {
+            return res.status(500).json({
+                error: "LOCAL_AI_URL is not configured."
+            });
+        }
+
+        if (!localAISecret) {
+            return res.status(500).json({
+                error: "LOCAL_AI_SECRET is not configured."
+            });
+        }
+
+        /*
+         * Forward the Firebase token and local secret
+         * to the local bridge.
+         *
+         * The local bridge is responsible for verifying
+         * the secret and whether Work Mode is currently
+         * enabled.
+         */
+
+        const response =
+            await fetch(
+                `${localAIUrl}/api/work/screen-size`,
+                {
+                    method: "GET",
+
+                    headers: {
+                        "Authorization":
+                            `Bearer ${localAISecret}`,
+
+                        "X-Firebase-Token":
+                            idToken
+                    }
+                }
+            );
+
+        const text =
+            await response.text();
+
+        let data;
+
+        try {
+            data =
+                JSON.parse(text);
+        } catch {
+            data = {
+                raw: text
+            };
+        }
+
+        if (!response.ok) {
+            return res.status(
+                response.status
+            ).json({
+                error:
+                    data.error ||
+                    "Local screen-size request failed."
+            });
+        }
+
+        return res.status(200).json(data);
+
+    } catch (error) {
+
+        console.error(
+            "screen-size function error:",
+            error
+        );
+
+        return res.status(500).json({
+            error:
+                error.message ||
+                "Screen-size function failed."
+        });
+    }
+}
