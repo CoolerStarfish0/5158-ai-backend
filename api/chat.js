@@ -164,6 +164,12 @@ export default async function handler(req, res) {
                 uid === ownerUid
             );
 
+        // Rank is read from server-owned Firestore data, never from the browser prompt.
+        const rankSnapshot = isOwner ? null : await db.collection("userRanks").doc(uid).get();
+        const storedRank = String(rankSnapshot?.data()?.rank || "").toUpperCase();
+        const allowedRanks = new Set(["WARDEN", "PIONEER", "RESIDENT", "VISITOR"]);
+        const verifiedRank = isOwner ? "OWNER" : (allowedRanks.has(storedRank) ? storedRank : "VISITOR");
+
         // ==========================================
         // ADMIN ACTION PROTECTION
         // ==========================================
@@ -205,6 +211,7 @@ VERIFIED APPLICATION IDENTITY:
 
 - Firebase UID: ${uid}
 - Account email: ${email || "Unknown"}
+- Verified rank: ${verifiedRank}
 - Owner status: ${isOwner ? "OWNER" : "REGULAR USER"}
 
 IMPORTANT:
