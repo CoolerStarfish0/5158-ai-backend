@@ -32,6 +32,9 @@ module.exports = async (req, res) => {
   try {
     initFirebase();
 
+    const { enforceWorkRank } = await import("../../../lib/work-access.js");
+    if (!await enforceWorkRank(req, res)) return;
+
     const authHeader = req.headers.authorization || "";
 
     if (!authHeader.startsWith("Bearer ")) {
