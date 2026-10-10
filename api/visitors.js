@@ -9,6 +9,8 @@ export default async function handler(req, res) {
     if (!["GET", "POST"].includes(req.method)) return res.status(405).json({ error: "Method not allowed" });
     const origin = req.headers.origin;
     if (origin && origin !== allowedOrigin) return res.status(403).json({ error: "Origin not allowed" });
+    // Share this serverless function with rank management to stay within Vercel Hobby limits.
+    if (req.query?.mode === "ranks") return (await import("../lib/ranks.js")).default(req, res);
     try {
         const { getApps, initializeApp, cert } = await import("firebase-admin/app");
         const { getAuth } = await import("firebase-admin/auth");
