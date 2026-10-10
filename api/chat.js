@@ -1,3 +1,34 @@
+const DEFAULT_CREDIT_LIMITS = Object.freeze({
+    OWNER: null,
+    WARDEN: null,
+    PIONEER: null,
+    RESIDENT: 5000,
+    VISITOR: 1000
+});
+
+function getCreditState(data = {}, rank = "VISITOR") {
+    const mode = data.creditLimitMode === "custom" ? "custom" : "default";
+    const limit = mode === "custom"
+        ? (data.creditLimit === null || data.creditLimit === undefined ? null : Math.max(0, Math.floor(Number(data.creditLimit) || 0)))
+        : (DEFAULT_CREDIT_LIMITS[rank] ?? null);
+    const used = Math.max(0, Math.floor(Number(data.creditsUsed) || 0));
+    return {
+        used,
+        limit,
+        remaining: limit === null ? null : Math.max(0, limit - used)
+    };
+}
+
+async function refundReservedCredit(db, uid) {
+    const ref = db.collection("userRanks").doc(uid);
+    await db.runTransaction(async transaction => {
+        const snapshot = await transaction.get(ref);
+        const data = snapshot.data() || {};
+        const used = Math.max(0, Math.floor(Number(data.creditsUsed) || 0));
+        transaction.set(ref, { creditsUsed: Math.max(0, used - 1) }, { merge: true });
+    });
+}
+
 export default async function handler(req, res) {
     // ==========================================
     // CORS
@@ -36,6 +67,8 @@ export default async function handler(req, res) {
         });
     }
 
+    let creditReservation = null;
+
     try {
         // ==========================================
         // REQUEST BODY
@@ -45,7 +78,8 @@ export default async function handler(req, res) {
             prompt,
             system,
             adminAction,
-            targetUser
+            targetUser,
+            workMode
         } = req.body || {};
 
         if (
@@ -165,10 +199,17 @@ export default async function handler(req, res) {
             );
 
         // Rank is read from server-owned Firestore data, never from the browser prompt.
-        const rankSnapshot = isOwner ? null : await db.collection("userRanks").doc(uid).get();
-        const storedRank = String(rankSnapshot?.data()?.rank || "").toUpperCase();
+        const rankSnapshot = await db.collection("userRanks").doc(uid).get();
+        const storedUserData = rankSnapshot.data() || {};
+        const storedRank = String(storedUserData.rank || "").toUpperCase();
         const allowedRanks = new Set(["WARDEN", "PIONEER", "RESIDENT", "VISITOR"]);
         const verifiedRank = isOwner ? "OWNER" : (allowedRanks.has(storedRank) ? storedRank : "VISITOR");
+
+        if (workMode === true && !["OWNER", "WARDEN", "PIONEER", "RESIDENT"].includes(verifiedRank)) {
+            return res.status(403).json({
+                error: "Work Mode is available to Resident rank and above."
+            });
+        }
 
         // ==========================================
         // ADMIN ACTION PROTECTION
@@ -201,6 +242,41 @@ export default async function handler(req, res) {
                     "Local AI environment variables are missing"
             });
         }
+
+        // Reserve one credit atomically for this model inference.
+        // Custom limits remain independent of rank changes.
+        const creditRef = db.collection("userRanks").doc(uid);
+        const reservation = await db.runTransaction(async transaction => {
+            const snapshot = await transaction.get(creditRef);
+            const stored = snapshot.data() || {};
+            const rankValue = isOwner ? "OWNER" : (allowedRanks.has(String(stored.rank || "").toUpperCase())
+                ? String(stored.rank).toUpperCase()
+                : "VISITOR");
+            const state = getCreditState(stored, rankValue);
+            if (state.limit !== null && state.used >= state.limit) {
+                return { blocked: true, credits: state };
+            }
+            const nextUsed = state.used + 1;
+            transaction.set(creditRef, { creditsUsed: nextUsed }, { merge: true });
+            const limit = state.limit;
+            return {
+                blocked: false,
+                credits: {
+                    used: nextUsed,
+                    limit,
+                    remaining: limit === null ? null : Math.max(0, limit - nextUsed),
+                    charged: 1
+                }
+            };
+        });
+
+        if (reservation.blocked) {
+            return res.status(429).json({
+                error: "You've reached your Axon credit limit. Ask the owner to increase it, or wait until your limit is changed.",
+                credits: { ...reservation.credits, charged: 0 }
+            });
+        }
+        creditReservation = { db, uid };
 
         // ==========================================
         // BUILD TRUSTED IDENTITY
@@ -688,6 +764,8 @@ SECURITY RULES FOR PRIVATE MEMORIES:
                 error
             );
 
+            await refundReservedCredit(db, uid);
+            creditReservation = null;
             return res.status(502).json({
                 error:
                     "Local AI returned an invalid response"
@@ -704,6 +782,8 @@ SECURITY RULES FOR PRIVATE MEMORIES:
                 data
             );
 
+            await refundReservedCredit(db, uid);
+            creditReservation = null;
             return res.status(502).json({
                 error:
                     data.error ||
@@ -723,6 +803,8 @@ SECURITY RULES FOR PRIVATE MEMORIES:
             typeof data.answer !== "string" ||
             data.answer.trim() === ""
         ) {
+            await refundReservedCredit(db, uid);
+            creditReservation = null;
             return res.status(502).json({
                 error:
                     "Local AI returned no answer"
@@ -733,6 +815,8 @@ SECURITY RULES FOR PRIVATE MEMORIES:
         // SUCCESS
         // ==========================================
 
+        const credits = reservation.credits;
+        creditReservation = null;
         return res.status(200).json({
             answer:
                 data.answer.trim(),
@@ -749,10 +833,20 @@ SECURITY RULES FOR PRIVATE MEMORIES:
                 true,
 
             owner:
-                isOwner
+                isOwner,
+
+            credits
         });
 
     } catch (error) {
+        if (creditReservation) {
+            try {
+                await refundReservedCredit(creditReservation.db, creditReservation.uid);
+            } catch (refundError) {
+                console.error("Could not refund failed AI credit:", refundError);
+            }
+            creditReservation = null;
+        }
         console.error(
             "Local AI error:",
             error
