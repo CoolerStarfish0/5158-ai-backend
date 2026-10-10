@@ -25,6 +25,9 @@ export default async function handler(req, res) {
     }
 
     try {
+        const { enforceWorkRank } = await import("../../../lib/work-access.js");
+        if (!await enforceWorkRank(req, res)) return;
+
         const authHeader =
             req.headers.authorization || "";
 
