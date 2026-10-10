@@ -73,6 +73,10 @@ export default async function handler(req, res) {
             getAuth
         } = await import("firebase-admin/auth");
 
+        const {
+            getFirestore
+        } = await import("firebase-admin/firestore");
+
         if (getApps().length === 0) {
             if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
                 return res.status(500).json({
@@ -97,8 +101,9 @@ export default async function handler(req, res) {
         // VERIFY USER
         // ==========================================
 
+        let decodedToken;
         try {
-            await firebaseAuth.verifyIdToken(idToken);
+            decodedToken = await firebaseAuth.verifyIdToken(idToken);
         } catch (error) {
             console.error(
                 "Firebase token verification failed:",
@@ -109,6 +114,16 @@ export default async function handler(req, res) {
                 error:
                     "Invalid or expired login session"
             });
+        }
+
+        const ownerUid = process.env.OWNER_UID;
+        const isOwner = Boolean(ownerUid && decodedToken.uid === ownerUid && decodedToken.firebase?.sign_in_provider !== "anonymous");
+        const db = getFirestore();
+        const rankSnapshot = await db.collection("userRanks").doc(decodedToken.uid).get();
+        const storedRank = String(rankSnapshot.data()?.rank || "").toUpperCase();
+        const rank = isOwner ? "OWNER" : (["WARDEN", "PIONEER", "RESIDENT"].includes(storedRank) ? storedRank : "VISITOR");
+        if (!["OWNER", "WARDEN", "PIONEER", "RESIDENT"].includes(rank)) {
+            return res.status(403).json({ error: "Work Mode is available to Resident rank and above." });
         }
 
         // ==========================================
