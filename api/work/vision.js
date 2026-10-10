@@ -111,6 +111,9 @@ export default async function handler(req, res) {
             });
         }
 
+        const { enforceWorkRank } = await import("../../lib/work-access.js");
+        if (!await enforceWorkRank(req, res)) return;
+
         // ==========================================
         // LOCAL AI SETTINGS
         // ==========================================
