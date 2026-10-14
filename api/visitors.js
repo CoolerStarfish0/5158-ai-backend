@@ -31,6 +31,36 @@ export default async function handler(req, res) {
         } else if (req.method === "GET") {
             return res.status(401).json({ error: "Authentication required" });
         }
+        if (req.query?.mode === "chats") {
+            const ownerUid = process.env.OWNER_UID;
+            if (req.method === "GET") {
+                if (!decodedToken || decodedToken.uid !== ownerUid || decodedToken.firebase?.sign_in_provider === "anonymous") return res.status(403).json({ error: "Owner access required" });
+                const visitorId = String(req.query.visitorId || "");
+                if (!/^[A-Za-z0-9_-]{8,120}$/.test(visitorId)) return res.status(400).json({ error: "Invalid visitor" });
+                const snapshot = await db.collection("visitorLogs").doc(visitorId).collection("consentedChats").limit(100).get();
+                const chats = await Promise.all(snapshot.docs.map(async d => { const messages = await d.ref.collection("messages").orderBy("at", "asc").limit(300).get(); return { id: d.id, ...d.data(), messages: messages.docs.map(m => m.data()) }; }));
+                chats.sort((a,b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+                return res.status(200).json({ chats });
+            }
+            const body = req.body || {};
+            if (!decodedToken || body.consent !== true) return res.status(403).json({ error: "Sign-in and explicit chat-sharing consent required" });
+            const visitorId = String(body.visitorId || "");
+            const chatId = String(body.chatId || "");
+            if (!/^[A-Za-z0-9_-]{8,120}$/.test(visitorId) || !/^[A-Za-z0-9_-]{8,120}$/.test(chatId)) return res.status(400).json({ error: "Invalid chat identifiers" });
+            const role = body.role;
+            const content = body.content;
+            if (!["USER", "AXON"].includes(role) || typeof content !== "string" || !content.trim() || content.length > 30000) return res.status(400).json({ error: "Invalid message" });
+            const visitorRef = db.collection("visitorLogs").doc(visitorId);
+            const visitor = await visitorRef.get();
+            if (!visitor.exists || visitor.data().uid !== decodedToken.uid) return res.status(403).json({ error: "Visitor account mismatch" });
+            const chatRef = visitorRef.collection("consentedChats").doc(chatId);
+            const messageId = String(body.messageId || "");
+            if (!/^[A-Za-z0-9_-]{8,120}$/.test(messageId)) return res.status(400).json({ error: "Invalid message ID" });
+            const timestamp = new Date().toISOString();
+            await chatRef.collection("messages").doc(messageId).set({ role, content, at: timestamp });
+            await chatRef.set({ title: String(body.title || "New chat").slice(0, 90), updatedAt: timestamp, uid: decodedToken.uid }, { merge: true });
+            return res.status(200).json({ ok: true });
+        }
         if (req.method === "GET") {
             const ownerUid = process.env.OWNER_UID;
             if (!decodedToken || !ownerUid || decodedToken.uid !== ownerUid || decodedToken.firebase?.sign_in_provider === "anonymous") {
