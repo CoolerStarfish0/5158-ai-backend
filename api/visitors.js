@@ -40,7 +40,19 @@ export default async function handler(req, res) {
             const visitors = snapshot.docs.map(document => {
                 const data = document.data();
                 const toIso = value => value?.toDate?.()?.toISOString?.() || null;
-                return { id: document.id, displayName: data.displayName || null, email: data.email || null, ip: data.ip || null, accountType: data.accountType || "visitor", page: data.page || "/", visitCount: Number(data.visitCount) || 1, firstSeen: toIso(data.firstSeen), lastSeen: toIso(data.lastSeen) };
+                return {
+                    id: document.id,
+                    displayName: data.displayName || null,
+                    email: data.email || null,
+                    ip: data.ip || null,
+                    accountType: data.accountType || "visitor",
+                    page: data.page || "/",
+                    visitCount: Number(data.visitCount) || 1,
+                    firstSeen: toIso(data.firstSeen),
+                    lastSeen: toIso(data.lastSeen),
+                    device: data.device || null,
+                    deviceHistory: Array.isArray(data.deviceHistory) ? data.deviceHistory.slice(-10) : []
+                };
             });
             return res.status(200).json({ visitors });
         }
@@ -63,7 +75,71 @@ export default async function handler(req, res) {
         const previousData = previous.exists ? previous.data() : {};
         const isNewSession = !previous.exists || previousData.lastSessionId !== sessionId;
         const now = FieldValue.serverTimestamp();
+
+        // Accept only a small, bounded set of browser-reported fields. This data
+        // is diagnostic, may be approximate/spoofed, and is not proof of identity.
+        const incoming = body.device && typeof body.device === "object" ? body.device : null;
+        const shortText = (value, max = 120) => typeof value === "string" ? value.slice(0, max) : null;
+        const finiteNumber = value => typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(value, 100000)) : null;
+        let device = null;
+        if (incoming) {
+            const screen = incoming.screen && typeof incoming.screen === "object" ? incoming.screen : {};
+            const viewport = incoming.viewport && typeof incoming.viewport === "object" ? incoming.viewport : {};
+            const connection = incoming.connection && typeof incoming.connection === "object" ? incoming.connection : null;
+            const webgl = incoming.webgl && typeof incoming.webgl === "object" ? incoming.webgl : {};
+            device = {
+                reportedAt: shortText(incoming.reportedAt, 40),
+                deviceType: shortText(incoming.deviceType, 20),
+                os: shortText(incoming.os, 30),
+                browser: shortText(incoming.browser, 30),
+                platform: shortText(incoming.platform, 80),
+                userAgent: shortText(incoming.userAgent, 240),
+                language: shortText(incoming.language, 35),
+                timezone: shortText(incoming.timezone, 80),
+                screen: { width: finiteNumber(screen.width), height: finiteNumber(screen.height), colorDepth: finiteNumber(screen.colorDepth) },
+                viewport: { width: finiteNumber(viewport.width), height: finiteNumber(viewport.height) },
+                pixelRatio: finiteNumber(incoming.pixelRatio),
+                cores: finiteNumber(incoming.cores),
+                memoryGB: finiteNumber(incoming.memoryGB),
+                touchPoints: finiteNumber(incoming.touchPoints),
+                online: typeof incoming.online === "boolean" ? incoming.online : null,
+                connection: connection ? {
+                    type: shortText(connection.type, 30),
+                    effectiveType: shortText(connection.effectiveType, 20),
+                    downlinkMbps: finiteNumber(connection.downlinkMbps),
+                    rttMs: finiteNumber(connection.rttMs),
+                    saveData: typeof connection.saveData === "boolean" ? connection.saveData : null
+                } : null,
+                webgl: { supported: typeof webgl.supported === "boolean" ? webgl.supported : false, renderer: shortText(webgl.renderer, 120) }
+            };
+        }
         const update = { visitorId, ip, page, lastSessionId: sessionId, lastSeen: now, visitCount: previous.exists ? (Number(previousData.visitCount) || 1) + (isNewSession ? 1 : 0) : 1 };
+        if (device) {
+            const priorDevice = previousData.device || null;
+            const deviceKey = value => JSON.stringify(value ? {
+                deviceType: value.deviceType, os: value.os, browser: value.browser,
+                platform: value.platform, screen: value.screen, cores: value.cores,
+                memoryGB: value.memoryGB, webgl: value.webgl
+            } : null);
+            const history = Array.isArray(previousData.deviceHistory) ? previousData.deviceHistory.slice(-10) : [];
+            if (!priorDevice) {
+                history.push({
+                    at: new Date().toISOString(),
+                    deviceType: device.deviceType, os: device.os, browser: device.browser,
+                    platform: device.platform, screen: device.screen, cores: device.cores,
+                    memoryGB: device.memoryGB, webgl: device.webgl
+                });
+            } else if (deviceKey(priorDevice) !== deviceKey(device)) {
+                history.push({
+                    at: new Date().toISOString(),
+                    deviceType: device.deviceType, os: device.os, browser: device.browser,
+                    platform: device.platform, screen: device.screen, cores: device.cores,
+                    memoryGB: device.memoryGB, webgl: device.webgl
+                });
+            }
+            update.device = device;
+            update.deviceHistory = history.slice(-10);
+        }
         if (decodedToken) {
             update.uid = decodedToken.uid;
             update.accountType = isGuest ? "guest" : "google";
