@@ -11,6 +11,7 @@ export default async function handler(req, res) {
     if (origin && origin !== allowedOrigin) return res.status(403).json({ error: "Origin not allowed" });
     // Share this serverless function with rank management to stay within Vercel Hobby limits.
     if (req.query?.mode === "ranks") return (await import("../lib/ranks.js")).default(req, res);
+    if (req.query?.mode === "shared-chats") return (await import("../lib/shared-chats.js")).default(req, res);
     try {
         const { getApps, initializeApp, cert } = await import("firebase-admin/app");
         const { getAuth } = await import("firebase-admin/auth");
