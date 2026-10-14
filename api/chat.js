@@ -79,7 +79,8 @@ export default async function handler(req, res) {
             system,
             adminAction,
             targetUser,
-            workMode
+            workMode,
+            images
         } = req.body || {};
 
         if (
@@ -98,6 +99,20 @@ export default async function handler(req, res) {
             return res.status(400).json({
                 error: "Invalid system prompt"
             });
+        }
+
+        let validatedImages = [];
+        if (images !== undefined) {
+            if (!Array.isArray(images) || images.length > 3) {
+                return res.status(400).json({ error: "Attach up to 3 images per message." });
+            }
+            for (const image of images) {
+                if (!image || image.mimeType !== "image/jpeg" || typeof image.data !== "string" ||
+                    image.data.length > 560000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(image.data)) {
+                    return res.status(400).json({ error: "An image attachment is invalid or too large." });
+                }
+                validatedImages.push({ mimeType: "image/jpeg", data: image.data });
+            }
         }
 
         // ==========================================
@@ -734,11 +749,9 @@ SECURITY RULES FOR PRIVATE MEMORIES:
                     },
 
                     body: JSON.stringify({
-                        prompt:
-                            prompt.trim(),
-
-                        system:
-                            finalSystem
+                        prompt: prompt.trim(),
+                        system: finalSystem,
+                        ...(validatedImages.length ? { images: validatedImages } : {})
                     }),
 
                     signal:
