@@ -105,6 +105,39 @@ export default async function handler(req, res) {
             })) });
         }
 
+        if (action === "patch_file") {
+            if (body.confirmed !== true) return jsonError(res, 400, "Explicit confirmation is required before changing a repository.");
+            const path = safePath(body.path);
+            const expectedSha = String(body.sha || "");
+            const findText = body.find;
+            const replaceText = body.replace;
+            const message = String(body.message || "").trim().slice(0, 180);
+            if (!/^[0-9a-f]{40}$/i.test(expectedSha)) return jsonError(res, 400, "A current file SHA is required to patch a file.");
+            if (typeof findText !== "string" || !findText || findText.length > 20000) return jsonError(res, 400, "The exact text to find must be 1–20,000 characters.");
+            if (typeof replaceText !== "string" || replaceText.length > 20000) return jsonError(res, 400, "Replacement text must be under 20,000 characters.");
+            if (!message) return jsonError(res, 400, "A commit message is required.");
+            const fileUrl = apiBase + "/contents/" + path.split("/").map(encodeURIComponent).join("/");
+            const current = await githubFetch(fileUrl);
+            if (Array.isArray(current) || current.type !== "file") return jsonError(res, 400, "That path is not a file.");
+            if (current.sha !== expectedSha) return jsonError(res, 409, "The file changed since Axon read it. Read the latest version before retrying.");
+            if (current.size > 180000) return jsonError(res, 413, "That file is too large to patch safely.");
+            const currentText = Buffer.from(String(current.content || "").replace(/\n/g, ""), "base64").toString("utf8");
+            const occurrences = currentText.split(findText).length - 1;
+            if (occurrences !== 1) return jsonError(res, 409, "The exact text must occur once. No change was made; inspect the file and choose a more specific patch.");
+            const nextText = currentText.replace(findText, replaceText);
+            if (Buffer.byteLength(nextText, "utf8") > 180000) return jsonError(res, 413, "Patched file exceeds the safe size limit.");
+            const committed = await githubFetch(fileUrl, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    message,
+                    sha: current.sha,
+                    content: Buffer.from(nextText, "utf8").toString("base64")
+                })
+            });
+            return res.status(200).json({ action, repo, path, commitSha: committed.commit?.sha || null, url: committed.content?.html_url || null });
+        }
+
         if (action === "create_file" || action === "update_file") {
             if (body.confirmed !== true) return jsonError(res, 400, "Explicit confirmation is required before changing a repository.");
             const path = safePath(body.path);
