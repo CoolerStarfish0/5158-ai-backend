@@ -32,3 +32,12 @@ The visible Axon Work Mode panel has been replaced with a unified agent panel. G
 For Google OAuth, follow [GOOGLE_AGENT_SETUP.md](./GOOGLE_AGENT_SETUP.md). The Google endpoint requires these server-side variables: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_TOKEN_ENCRYPTION_KEY`, `AXON_FRONTEND_URL`, and the existing `OWNER_UID` and `FIREBASE_SERVICE_ACCOUNT`.
 
 Google OAuth and API operations are not ready for live use until those variables are configured and the connected Google account authorizes the scopes. The agent does not have Google Sites editing support in this API pass.
+
+## Current manual setup still required
+
+The Production environment has the repository allowlist and Google callback/frontend settings configured. The Google token-encryption key is also stored as a secret. The following credentials are **not currently configured** and must be supplied by the account owner:
+
+1. `GITHUB_TOKEN`: create a fine-grained GitHub PAT using the repository permissions described above, then add it to Vercel Production.
+2. `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`: create a Web application OAuth client in Google Cloud and add both values to Vercel Production.
+
+After adding these secrets, redeploy the backend. Never share the values in chat. See [GOOGLE_AGENT_SETUP.md](./GOOGLE_AGENT_SETUP.md) for the Google Cloud API/OAuth steps.
