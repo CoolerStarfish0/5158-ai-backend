@@ -115,7 +115,7 @@ async function executeGoogleAction(db, uid, body) {
   if (action === "classroom_list_students") {
     const courseId = requireString(String(body.courseId || ""), "Course ID", 100);
     const data = await googleFetch("https://classroom.googleapis.com/v1/courses/" + encodeURIComponent(courseId) + "/students?pageSize=100", accessToken);
-    return { action, courseId, students: (data.students || []).map(student => ({ id: student.userId, name: student.profile?.name?.fullName || "", email: student.profile?.emailAddress || "" })) };
+    return { action, courseId, students: (data.students || []).map(student => ({ id: student.userId, name: student.profile?.name?.fullName || "" })) };
   }
   if (action === "google_create_doc") {
     requireConfirmed(body);
