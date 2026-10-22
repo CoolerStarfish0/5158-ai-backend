@@ -155,7 +155,7 @@ async function executeGoogleAction(db, uid, body) {
     });
     await googleFetch("https://forms.googleapis.com/v1/forms/" + encodeURIComponent(form.formId) + ":batchUpdate", accessToken, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requests: [{ createItem: { item: { title: question, questionItem: { question: { required: false, choiceQuestion: { type: "RADIO", options } } } }, location: { index: 0 } }] })
+      body: JSON.stringify({ requests: [{ createItem: { item: { title: question, questionItem: { question: { required: false, choiceQuestion: { type: "RADIO", options } } } }, location: { index: 0 } } }] })
     });
     return { action, title, formId: form.formId, url: form.responderUri || "https://docs.google.com/forms/d/" + form.formId + "/edit", editUrl: "https://docs.google.com/forms/d/" + form.formId + "/edit" };
   }
