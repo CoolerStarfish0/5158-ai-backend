@@ -1,0 +1,72 @@
+# Axon Google integrations — one-time setup
+
+This adds a server-side Google OAuth connection for Axon's owner account. The browser never receives the Google client secret or stored refresh token.
+
+## Google Cloud setup
+
+1. Open https://console.cloud.google.com/ and select or create a project.
+2. Enable these APIs in **APIs & Services → Library**:
+   - Google Drive API
+   - Google Docs API
+   - Google Sheets API
+   - Google Forms API
+   - Google Classroom API
+   - Google Calendar API
+   - Gmail API
+3. Configure **Google Auth Platform / OAuth consent screen**. For an initial test, use External + Testing if applicable, and add the Google account you will connect as a test user. Google may require verification or additional review before broad public use because some requested scopes are sensitive/restricted.
+4. Create an OAuth client ID of type **Web application**.
+5. Add this exact authorized redirect URI:
+   `https://5158-ai-backendpriv.vercel.app/api/google?action=callback`
+6. Copy the OAuth Client ID and Client Secret. Do not put either in frontend files or chat.
+
+## Vercel environment variables
+
+Open Vercel → project `5158-ai-backendpriv` → Settings → Environment Variables. Add these to Production (and Preview only if you want to test Preview deployments):
+
+- `GOOGLE_CLIENT_ID` = OAuth client ID from Google Cloud
+- `GOOGLE_CLIENT_SECRET` = OAuth client secret
+- `GOOGLE_REDIRECT_URI` = `https://5158-ai-backendpriv.vercel.app/api/google?action=callback`
+- `GOOGLE_TOKEN_ENCRYPTION_KEY` = a fresh 32-byte key encoded as 64 hex characters
+- `AXON_FRONTEND_URL` = `https://coolerstarfish0.github.io/my-ai/`
+- `OWNER_UID` = the Firebase UID of the Axon owner (should match the existing backend owner configuration)
+- `FIREBASE_SERVICE_ACCOUNT` = the existing Firebase Admin service-account JSON, if not already configured
+
+To generate an encryption key on your computer with Node.js, run this in PowerShell:
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+Paste the output directly into the Vercel environment variable value. Do not commit it or share it in chat. If the key is lost or changed, existing encrypted Google refresh tokens cannot be decrypted and you will need to reconnect Google.
+
+Save the variables and redeploy the backend.
+
+## What currently works in this first integration pass
+
+Once the backend is configured and Google is connected, the API supports:
+- Search Google Drive file names (read-only).
+- List active Google Classroom courses.
+- List students in a course when the Google account has roster permission.
+- Create Google Docs with text.
+- Create Google Sheets and populate rows.
+- Create Google Forms with a multiple-choice question.
+- Create Google Calendar events.
+- Create Gmail drafts (drafts are not sent).
+
+The frontend agent must ask for confirmation before creating or changing content. Sending Gmail messages is deliberately not implemented in this first pass.
+
+## Important limitations
+
+- Google Classroom roster access depends on the connected account's role and school-admin policies.
+- Google Forms/Drive/Docs access may be restricted by Workspace policies or OAuth consent-screen status.
+- Google Sites does not have a general-purpose modern site-editing API comparable to Docs/Sheets. Sites editing needs a separate supported browser-automation route; this endpoint does not claim to edit Sites.
+- OAuth consent may require Google's verification for production use. Testing mode is appropriate for initial owner-only testing.
+- The endpoint restricts the Google integration to the configured owner Firebase UID.
+- Tokens are encrypted at rest using AES-256-GCM before being stored in Firestore. Keep the encryption key private and stable.
+- This is not fully tested until the environment variables, Google OAuth client, APIs, and real account authorization are configured.
+
+## Troubleshooting
+
+- `Google OAuth isn't configured yet`: add the client ID and secret to Vercel and redeploy.
+- `GOOGLE_TOKEN_ENCRYPTION_KEY`: generate a valid 32-byte key as described above.
+- `Google is not connected`: use Connect Google in Axon and finish the consent screen.
+- `access_denied` or an unverified-app warning: check the OAuth consent screen and test-user list.
+- Classroom 403: the API may not be enabled, or the account may not be allowed to view that class roster.
