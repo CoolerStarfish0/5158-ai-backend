@@ -16,7 +16,7 @@ This adds a server-side Google OAuth connection for Axon's owner account. The br
 3. Configure **Google Auth Platform / OAuth consent screen**. For an initial test, use External + Testing if applicable, and add the Google account you will connect as a test user. Google may require verification or additional review before broad public use because some requested scopes are sensitive/restricted.
 4. Create an OAuth client ID of type **Web application**.
 5. Add this exact authorized redirect URI:
-   `https://5158-ai-backendpriv.vercel.app/api/google?action=callback`
+   `https://5158-ai-backendpriv.vercel.app/api/agent?mode=google&action=callback`
 6. Copy the OAuth Client ID and Client Secret. Do not put either in frontend files or chat.
 
 ## Vercel environment variables
@@ -24,7 +24,7 @@ This adds a server-side Google OAuth connection for Axon's owner account. The br
 Open Vercel → project `5158-ai-backendpriv` → Settings → Environment Variables.
 
 **Already configured in Production by the Axon implementation pass:**
-- `GOOGLE_REDIRECT_URI` = `https://5158-ai-backendpriv.vercel.app/api/google?action=callback`
+- `GOOGLE_REDIRECT_URI` = `https://5158-ai-backendpriv.vercel.app/api/agent?mode=google&action=callback`
 - `AXON_FRONTEND_URL` = `https://coolerstarfish0.github.io/my-ai/`
 - `GOOGLE_TOKEN_ENCRYPTION_KEY` = generated and stored as a secret. **Do not overwrite, regenerate, or share this key.**
 - `OWNER_UID` and `FIREBASE_SERVICE_ACCOUNT` already exist in the Production environment.
@@ -68,3 +68,6 @@ The frontend agent must ask for confirmation before creating or changing content
 - `Google is not connected`: use Connect Google in Axon and finish the consent screen.
 - `access_denied` or an unverified-app warning: check the OAuth consent screen and test-user list.
 - Classroom 403: the API may not be enabled, or the account may not be allowed to view that class roster.
+
+
+Implementation note: Google OAuth and actions are dispatched through the existing `/api/agent?mode=google&action=...` route so the backend does not add another Vercel Serverless Function. The production callback URL has already been updated to match this route.
