@@ -99,9 +99,14 @@ export default async function handler(req, res) {
             const query = String(body.query || "").trim();
             if (!query || query.length > 160) return jsonError(res, 400, "Provide a search query up to 160 characters.");
             const encoded = encodeURIComponent(query + " repo:" + repo);
-            const data = await githubFetch("https://api.github.com/search/code?q=" + encoded + "&per_page=10");
+            const data = await githubFetch("https://api.github.com/search/code?q=" + encoded + "&per_page=10", {
+                headers: { Accept: "application/vnd.github.text-match+json" }
+            });
             return res.status(200).json({ action, repo, totalCount: data.total_count || 0, results: (data.items || []).slice(0, 10).map(item => ({
-                path: item.path, url: item.html_url, name: item.name
+                path: item.path,
+                url: item.html_url,
+                name: item.name,
+                snippets: (item.text_matches || []).slice(0, 3).map(match => String(match.fragment || "").slice(0, 1200))
             })) });
         }
 
