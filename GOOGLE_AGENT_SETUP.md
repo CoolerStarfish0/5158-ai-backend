@@ -41,13 +41,13 @@ After adding the two values, save and redeploy the backend. Keep the existing en
 
 Once the backend is configured and Google is connected, the API supports:
 - Search Google Drive file names (read-only).
-- List active Google Classroom courses.
-- List students in a course when the Google account has roster permission.
+- List active Google Classroom courses and retrieve a roster when the account has permission.
+- Read Google Docs, append text, and replace one verified unique text occurrence.
 - Create Google Docs with text.
-- Create Google Sheets and populate rows.
-- Create Google Forms with a multiple-choice question.
-- Create Google Calendar events.
-- Create Gmail drafts (drafts are not sent).
+- Read spreadsheet ranges, create Sheets, and update selected ranges.
+- Read existing Google Forms, create Forms, and add multiple-choice questions.
+- List upcoming Calendar events and create Calendar events.
+- Create Gmail drafts (drafts are not sent; sending is not implemented in this pass).
 
 The frontend agent must ask for confirmation before creating or changing content. Sending Gmail messages is deliberately not implemented in this first pass.
 
