@@ -21,23 +21,21 @@ This adds a server-side Google OAuth connection for Axon's owner account. The br
 
 ## Vercel environment variables
 
-Open Vercel → project `5158-ai-backendpriv` → Settings → Environment Variables. Add these to Production (and Preview only if you want to test Preview deployments):
+Open Vercel → project `5158-ai-backendpriv` → Settings → Environment Variables.
 
-- `GOOGLE_CLIENT_ID` = OAuth client ID from Google Cloud
-- `GOOGLE_CLIENT_SECRET` = OAuth client secret
+**Already configured in Production by the Axon implementation pass:**
 - `GOOGLE_REDIRECT_URI` = `https://5158-ai-backendpriv.vercel.app/api/google?action=callback`
-- `GOOGLE_TOKEN_ENCRYPTION_KEY` = a fresh 32-byte key encoded as 64 hex characters
 - `AXON_FRONTEND_URL` = `https://coolerstarfish0.github.io/my-ai/`
-- `OWNER_UID` = the Firebase UID of the Axon owner (should match the existing backend owner configuration)
-- `FIREBASE_SERVICE_ACCOUNT` = the existing Firebase Admin service-account JSON, if not already configured
+- `GOOGLE_TOKEN_ENCRYPTION_KEY` = generated and stored as a secret. **Do not overwrite, regenerate, or share this key.**
+- `OWNER_UID` and `FIREBASE_SERVICE_ACCOUNT` already exist in the Production environment.
 
-To generate an encryption key on your computer with Node.js, run this in PowerShell:
-```powershell
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-Paste the output directly into the Vercel environment variable value. Do not commit it or share it in chat. If the key is lost or changed, existing encrypted Google refresh tokens cannot be decrypted and you will need to reconnect Google.
+**You must add these two values from your Google Cloud OAuth client:**
+- `GOOGLE_CLIENT_ID` = OAuth client ID
+- `GOOGLE_CLIENT_SECRET` = OAuth client secret
 
-Save the variables and redeploy the backend.
+Set both to Production (and Preview only if you intentionally want to test Preview deployments). Do not paste either secret into chat or frontend files.
+
+After adding the two values, save and redeploy the backend. Keep the existing encryption key stable; if it is ever lost or changed, existing encrypted Google refresh tokens cannot be decrypted and you will need to reconnect Google.
 
 ## What currently works in this first integration pass
 
