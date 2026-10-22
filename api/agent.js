@@ -8,6 +8,8 @@ function jsonError(res, status, error) {
 }
 
 export default async function handler(req, res) {
+    // Share this route with Google OAuth/actions to stay within the Vercel Hobby function-count limit.
+    if (req.query?.mode === "google") return (await import("../lib/google-agent.js")).default(req, res);
     const allowedOrigin = "https://coolerstarfish0.github.io";
     res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
