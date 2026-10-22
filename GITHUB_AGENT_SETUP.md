@@ -24,3 +24,11 @@ The in-chat GitHub agent uses the backend endpoint `/api/agent`. It does not use
 - Exact-match patches require a current file SHA and a unique match; stale files or ambiguous patches are rejected.
 - Workflow files and likely secret files are blocked from these tools.
 - Writes currently commit directly to the repository's default branch after confirmation. Review the path, commit message, and preview carefully before approving.
+
+## Google and unified autonomous agent
+
+The visible Axon Work Mode panel has been replaced with a unified agent panel. GitHub repository actions and configured Google actions run through normal chat. Optional local computer access remains a separately approved capability inside that same panel.
+
+For Google OAuth, follow [GOOGLE_AGENT_SETUP.md](./GOOGLE_AGENT_SETUP.md). The Google endpoint requires these server-side variables: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_TOKEN_ENCRYPTION_KEY`, `AXON_FRONTEND_URL`, and the existing `OWNER_UID` and `FIREBASE_SERVICE_ACCOUNT`.
+
+Google OAuth and API operations are not ready for live use until those variables are configured and the connected Google account authorizes the scopes. The agent does not have Google Sites editing support in this API pass.
