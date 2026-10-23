@@ -808,44 +808,38 @@ SECURITY RULES FOR PRIVATE MEMORIES:
         // READ LOCAL AI RESPONSE
         // ==========================================
 
-        let data;
-
+        // Tunnel/proxy failures sometimes return HTML (404/502/Cloudflare)
+        // rather than JSON. Report the upstream HTTP status clearly.
+        const upstreamContentType = response.headers.get("content-type") || "";
+        let data = null;
         try {
-            data =
-                await response.json();
+            const raw = await response.text();
+            if (upstreamContentType.includes("application/json") || raw.trimStart().startsWith("{")) {
+                data = JSON.parse(raw);
+            }
         } catch (error) {
-            console.error(
-                "Invalid response from local AI:",
-                error
-            );
+            console.error("Could not parse local AI response:", error);
+        }
 
+        if (!data || typeof data !== "object") {
+            console.error("Local AI returned non-JSON response", {
+                status: response.status,
+                contentType: upstreamContentType
+            });
             await refundReservedCredit(db, uid, reservationDate);
             creditReservation = null;
             return res.status(502).json({
-                error:
-                    "Local AI returned an invalid response"
+                error: "Local AI bridge returned an unexpected response (HTTP " + response.status + "). Check that the local bridge and Cloudflare Tunnel are running and LOCAL_AI_URL points to the bridge endpoint."
             });
         }
 
-        // ==========================================
-        // LOCAL AI ERROR
-        // ==========================================
-
         if (!response.ok) {
-            console.error(
-                "Local AI request failed:",
-                data
-            );
-
-            await refundReservedCredit(db, uid);
+            console.error("Local AI request failed:", { status: response.status, error: data.error });
+            await refundReservedCredit(db, uid, reservationDate);
             creditReservation = null;
             return res.status(502).json({
-                error:
-                    data.error ||
-                    "Local AI request failed",
-
-                details:
-                    data.details || null
+                error: typeof data.error === "string" ? data.error : "Local AI request failed (HTTP " + response.status + ")",
+                details: typeof data.details === "string" ? data.details : null
             });
         }
 
@@ -858,7 +852,7 @@ SECURITY RULES FOR PRIVATE MEMORIES:
             typeof data.answer !== "string" ||
             data.answer.trim() === ""
         ) {
-            await refundReservedCredit(db, uid);
+            await refundReservedCredit(db, uid, reservationDate);
             creditReservation = null;
             return res.status(502).json({
                 error:
