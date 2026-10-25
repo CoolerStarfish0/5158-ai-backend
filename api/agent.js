@@ -8,15 +8,18 @@ function jsonError(res, status, error) {
 }
 
 export default async function handler(req, res) {
-    // Share this route with Google OAuth/actions to stay within the Vercel Hobby function-count limit.
-    if (req.query?.mode === "google") return (await import("../lib/google-agent.js")).default(req, res);
+    // Apply CORS to every route, including Google OAuth status/start calls.
+    // GitHub Pages sends an OPTIONS preflight when fetch includes Authorization.
     const allowedOrigin = "https://coolerstarfish0.github.io";
     res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Max-Age", "600");
     res.setHeader("Cache-Control", "no-store, max-age=0");
     res.setHeader("Vary", "Origin");
     if (req.method === "OPTIONS") return res.status(200).end();
+    // Share this route with Google OAuth/actions to stay within the Vercel Hobby function-count limit.
+    if (req.query?.mode === "google") return (await import("../lib/google-agent.js")).default(req, res);
     if (req.method !== "POST") return jsonError(res, 405, "Method not allowed");
     const origin = req.headers.origin;
     if (origin && origin !== allowedOrigin) return jsonError(res, 403, "Origin not allowed");
