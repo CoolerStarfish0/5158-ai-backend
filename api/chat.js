@@ -11,6 +11,7 @@ function indiaDateKey(date = new Date()) {
 
 const DEFAULT_CREDIT_LIMITS = Object.freeze({
     OWNER: null,
+    ADMIN: null,
     WARDEN: null,
     PIONEER: null,
     RESIDENT: 5000,
@@ -239,10 +240,10 @@ export default async function handler(req, res) {
         const rankSnapshot = await db.collection("userRanks").doc(uid).get();
         const storedUserData = rankSnapshot.data() || {};
         const storedRank = String(storedUserData.rank || "").toUpperCase();
-        const allowedRanks = new Set(["WARDEN", "PIONEER", "RESIDENT", "VISITOR"]);
+        const allowedRanks = new Set(["ADMIN", "WARDEN", "PIONEER", "RESIDENT", "VISITOR"]);
         const verifiedRank = isOwner ? "OWNER" : (allowedRanks.has(storedRank) ? storedRank : "VISITOR");
 
-        if (workMode === true && !["OWNER", "WARDEN", "PIONEER", "RESIDENT"].includes(verifiedRank)) {
+        if (workMode === true && !["OWNER", "ADMIN", "WARDEN", "PIONEER", "RESIDENT"].includes(verifiedRank)) {
             return res.status(403).json({
                 error: "Work Mode is available to Resident rank and above."
             });
