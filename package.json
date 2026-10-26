@@ -1,6 +1,7 @@
 {
   "type": "module",
   "dependencies": {
-    "firebase-admin": "13.5.0"
+    "firebase-admin": "13.5.0",
+    "pptxgenjs": "^3.12.0"
   }
 }
