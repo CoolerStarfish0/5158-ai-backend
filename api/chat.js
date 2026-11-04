@@ -1,3 +1,109 @@
+import dns from "node:dns/promises";
+import net from "node:net";
+
+const linkPreviewCache = new Map();
+
+function isPrivatePreviewIPv4(ip) {
+    const p = ip.split(".").map(Number);
+    if (p.length !== 4 || p.some(n => !Number.isInteger(n) || n < 0 || n > 255)) return true;
+    return p[0] === 10 || p[0] === 127 || p[0] === 0 ||
+        (p[0] === 169 && p[1] === 254) ||
+        (p[0] === 172 && p[1] >= 16 && p[1] <= 31) ||
+        (p[0] === 192 && p[1] === 168) ||
+        (p[0] === 100 && p[1] >= 64 && p[1] <= 127) || p[0] >= 224;
+}
+
+async function validatePreviewUrl(value) {
+    let url;
+    try { url = new URL(value); } catch { throw new Error("Invalid URL."); }
+    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) throw new Error("Only public HTTP(S) links are supported.");
+    if (url.port && !["80", "443"].includes(url.port)) throw new Error("Unsupported port.");
+    const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) throw new Error("Private network addresses cannot be previewed.");
+    const family = net.isIP(host);
+    if (family === 4 && isPrivatePreviewIPv4(host)) throw new Error("Private network addresses cannot be previewed.");
+    if (family === 6) throw new Error("IPv6 literal addresses cannot be previewed.");
+    if (!family) {
+        const records = await dns.lookup(host, { all: true, verbatim: true });
+        if (!records.length || records.some(record => record.family !== 4 || isPrivatePreviewIPv4(record.address))) throw new Error("This host does not resolve exclusively to public addresses.");
+    }
+    return url;
+}
+
+function previewDecodeEntities(value) {
+    return value.replace(/&amp;/g, "&").replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+        .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+        .replace(/&#x([\da-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)));
+}
+
+function previewMeta(html, names) {
+    const tags = html.match(/<meta\b[^>]*>/gi) || [];
+    for (const tag of tags) {
+        const attrs = {};
+        tag.replace(/([a-zA-Z:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g, (_, key, a, b, c) => {
+            attrs[key.toLowerCase()] = a ?? b ?? c ?? "";
+            return "";
+        });
+        const key = String(attrs.property || attrs.name || "").toLowerCase();
+        if (names.includes(key) && attrs.content) return previewDecodeEntities(attrs.content.trim());
+    }
+    return "";
+}
+
+function previewPlainText(value) {
+    return previewDecodeEntities(value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ")).trim().slice(0, 300);
+}
+
+async function handleLinkPreview(req, res) {
+    try {
+        const raw = typeof req.query?.url === "string" ? req.query.url : "";
+        if (!raw || raw.length > 2048) return res.status(400).json({ error: "Provide a valid URL." });
+        const initial = await validatePreviewUrl(raw);
+        const cached = linkPreviewCache.get(initial.href);
+        if (cached && cached.expires > Date.now()) return res.status(200).json(cached.data);
+
+        let current = initial;
+        let response;
+        for (let hop = 0; hop <= 3; hop++) {
+            await validatePreviewUrl(current.href);
+            response = await fetch(current.href, {
+                redirect: "manual",
+                headers: { "User-Agent": "AxonLinkPreview/1.0 (+https://coolerstarfish0.github.io)", "Accept": "text/html,application/xhtml+xml" },
+                signal: AbortSignal.timeout(7000)
+            });
+            if ([301, 302, 303, 307, 308].includes(response.status)) {
+                const location = response.headers.get("location");
+                if (!location || hop === 3) throw new Error("Too many redirects.");
+                current = new URL(location, current);
+                continue;
+            }
+            break;
+        }
+        if (!response?.ok || !/text\/html|application\/xhtml\+xml/i.test(response.headers.get("content-type") || "")) throw new Error("The website did not provide a webpage preview.");
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error("The webpage could not be read.");
+        const chunks = [];
+        let total = 0;
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            total += value.byteLength;
+            if (total > 1024 * 1024) { await reader.cancel(); throw new Error("The webpage is too large to preview."); }
+            chunks.push(value);
+        }
+        const html = new TextDecoder().decode(Buffer.concat(chunks));
+        const titleTag = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+        const title = (previewMeta(html, ["og:title", "twitter:title"]) || previewPlainText(titleTag?.[1] || "") || current.hostname).slice(0, 180);
+        const description = (previewMeta(html, ["og:description", "twitter:description", "description"]) || "").slice(0, 300);
+        const data = { url: initial.href, finalUrl: current.href, title, description, siteName: previewMeta(html, ["og:site_name"]) || current.hostname };
+        linkPreviewCache.set(initial.href, { data, expires: Date.now() + 10 * 60 * 1000 });
+        return res.status(200).json(data);
+    } catch (error) {
+        return res.status(400).json({ error: error.message || "Preview unavailable." });
+    }
+}
+
 function indiaDateKey(date = new Date()) {
     const parts = new Intl.DateTimeFormat("en-CA", {
         timeZone: "Asia/Kolkata",
@@ -63,7 +169,7 @@ export default async function handler(req, res) {
 
     res.setHeader(
         "Access-Control-Allow-Methods",
-        "POST, OPTIONS"
+        "GET, POST, OPTIONS"
     );
 
     res.setHeader(
@@ -77,6 +183,10 @@ export default async function handler(req, res) {
 
     if (req.method === "OPTIONS") {
         return res.status(200).end();
+    }
+
+    if (req.method === "GET" && req.query?.mode === "link-preview") {
+        return await handleLinkPreview(req, res);
     }
 
     // ==========================================
