@@ -92,7 +92,8 @@ export default async function handler(req, res) {
         const body = req.body || {};
         const visitorId = typeof body.visitorId === "string" ? body.visitorId : "";
         const sessionId = typeof body.sessionId === "string" ? body.sessionId : "";
-        const page = typeof body.page === "string" ? body.page.slice(0, 300) : "/";\n        const activity = typeof body.activity === "string" ? body.activity.trim().slice(0, 80) : "";
+        const page = typeof body.page === "string" ? body.page.slice(0, 300) : "/";
+        const activity = typeof body.activity === "string" ? body.activity.trim().slice(0, 80) : "";
         if (!/^[A-Za-z0-9_-]{8,120}$/.test(visitorId) || !/^[A-Za-z0-9_-]{8,120}$/.test(sessionId)) return res.status(400).json({ error: "Invalid visitor or session ID" });
         const isGuest = decodedToken?.firebase?.sign_in_provider === "anonymous";
         let account = null;
