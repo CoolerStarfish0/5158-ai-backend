@@ -53,7 +53,6 @@ export default async function handler(req, res) {
     // ==========================================
 
     const allowedOrigins = new Set([
-        "https://coolerstarfish0.github.io",
         "https://coolerstarfish0.github.io"
     ]);
     const requestOrigin = req.headers.origin;
