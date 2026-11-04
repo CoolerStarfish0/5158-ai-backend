@@ -52,10 +52,15 @@ export default async function handler(req, res) {
     // CORS
     // ==========================================
 
-    res.setHeader(
-        "Access-Control-Allow-Origin",
+    const allowedOrigins = new Set([
+        "https://coolerstarfish0.github.io",
         "https://coolerstarfish0.github.io"
-    );
+    ]);
+    const requestOrigin = req.headers.origin;
+    if (requestOrigin && allowedOrigins.has(requestOrigin)) {
+        res.setHeader("Access-Control-Allow-Origin", requestOrigin);
+        res.setHeader("Vary", "Origin");
+    }
 
     res.setHeader(
         "Access-Control-Allow-Methods",
@@ -178,46 +183,62 @@ export default async function handler(req, res) {
             getFirestore
         } = await import("firebase-admin/firestore");
 
-        if (getApps().length === 0) {
-            if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-                return res.status(500).json({
-                    error:
-                        "FIREBASE_SERVICE_ACCOUNT is missing"
-                });
-            }
-
-            const serviceAccount =
-                JSON.parse(
-                    process.env.FIREBASE_SERVICE_ACCOUNT
-                );
-
-            initializeApp({
-                credential: cert(serviceAccount)
-            });
+        // The token audience identifies which Firebase project issued it.
+        // Decode only to select a verifier; verifyIdToken remains the trust boundary.
+        let tokenProjectId = "";
+        try {
+            const payloadPart = idToken.split(".")[1];
+            const payload = JSON.parse(Buffer.from(payloadPart, "base64url").toString("utf8"));
+            tokenProjectId = typeof payload.aud === "string" ? payload.aud : "";
+        } catch {
+            return res.status(401).json({ error: "Invalid login token format." });
         }
 
-        const firebaseAuth = getAuth();
-        const db = getFirestore();
+        const isRibbonRainToken = tokenProjectId === "ribbon-rain";
+        const primaryServiceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT;
+        if (!primaryServiceAccountRaw) {
+            return res.status(500).json({ error: "Axon's Firebase Admin credentials are not configured." });
+        }
+
+        let primaryApp = getApps().find(app => app.name === "[DEFAULT]");
+        if (!primaryApp) {
+            const primaryServiceAccount = JSON.parse(primaryServiceAccountRaw);
+            primaryApp = initializeApp({ credential: cert(primaryServiceAccount) });
+        }
+
+        let authApp = primaryApp;
+        if (isRibbonRainToken) {
+            const ribbonServiceAccountRaw = process.env.RIBBON_RAIN_FIREBASE_SERVICE_ACCOUNT;
+            if (!ribbonServiceAccountRaw) {
+                return res.status(503).json({
+                    error: "Ribbon Rain sign-in is not connected to Axon yet. The site administrator must configure its Firebase Admin credentials."
+                });
+            }
+            let ribbonApp = getApps().find(app => app.name === "ribbon-rain-auth");
+            if (!ribbonApp) {
+                const ribbonServiceAccount = JSON.parse(ribbonServiceAccountRaw);
+                if (ribbonServiceAccount.project_id !== "ribbon-rain") {
+                    return res.status(500).json({ error: "Ribbon Rain Firebase Admin credentials have the wrong project ID." });
+                }
+                ribbonApp = initializeApp({ credential: cert(ribbonServiceAccount), projectId: "ribbon-rain" }, "ribbon-rain-auth");
+            }
+            authApp = ribbonApp;
+        }
+
+        const firebaseAuth = getAuth(authApp);
+        // Keep Axon's own Firestore as the source of ranks, credits and Axon data.
+        const db = getFirestore(primaryApp);
 
         // ==========================================
         // VERIFY FIREBASE USER
         // ==========================================
 
         let decodedToken;
-
         try {
-            decodedToken =
-                await firebaseAuth.verifyIdToken(idToken);
+            decodedToken = await firebaseAuth.verifyIdToken(idToken);
         } catch (error) {
-            console.error(
-                "Firebase token verification failed:",
-                error
-            );
-
-            return res.status(401).json({
-                error:
-                    "Invalid or expired login session"
-            });
+            console.error("Firebase token verification failed for project:", tokenProjectId, error);
+            return res.status(401).json({ error: "Your sign-in token could not be verified. Please sign in again." });
         }
 
         const uid = decodedToken.uid;
