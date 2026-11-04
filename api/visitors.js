@@ -147,7 +147,8 @@ export default async function handler(req, res) {
                 webgl: { supported: typeof webgl.supported === "boolean" ? webgl.supported : false, renderer: shortText(webgl.renderer, 120) }
             };
         }
-        const update = { visitorId, ip, page, lastSessionId: sessionId, lastSeen: now, visitCount: previous.exists ? (Number(previousData.visitCount) || 1) + (isNewSession ? 1 : 0) : 1 };\n        if (activity) {\n            const activities = Array.isArray(previousData.recentActivities) ? previousData.recentActivities.slice(-29) : [];\n            activities.push({ label: activity, at: new Date().toISOString() });\n            update.recentActivities = activities.slice(-30);\n        }
+        const update = { visitorId, ip, page, lastSessionId: sessionId, lastSeen: now, visitCount: previous.exists ? (Number(previousData.visitCount) || 1) + (isNewSession ? 1 : 0) : 1 };
+        if (activity) {\n            const activities = Array.isArray(previousData.recentActivities) ? previousData.recentActivities.slice(-29) : [];\n            activities.push({ label: activity, at: new Date().toISOString() });\n            update.recentActivities = activities.slice(-30);\n        }
         if (device) {
             const priorDevice = previousData.device || null;
             const deviceKey = value => JSON.stringify(value ? {
