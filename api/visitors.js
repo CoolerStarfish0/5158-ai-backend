@@ -83,7 +83,7 @@ export default async function handler(req, res) {
                     firstSeen: toIso(data.firstSeen),
                     lastSeen: toIso(data.lastSeen),
                     device: data.device || null,
-                    deviceHistory: Array.isArray(data.deviceHistory) ? data.deviceHistory.slice(-10) : []
+                    deviceHistory: Array.isArray(data.deviceHistory) ? data.deviceHistory.slice(-10) : [],\n                    recentActivities: Array.isArray(data.recentActivities) ? data.recentActivities.slice(-30) : []
                 };
             });
             return res.status(200).json({ visitors });
@@ -91,7 +91,7 @@ export default async function handler(req, res) {
         const body = req.body || {};
         const visitorId = typeof body.visitorId === "string" ? body.visitorId : "";
         const sessionId = typeof body.sessionId === "string" ? body.sessionId : "";
-        const page = typeof body.page === "string" ? body.page.slice(0, 300) : "/";
+        const page = typeof body.page === "string" ? body.page.slice(0, 300) : "/";\n        const activity = typeof body.activity === "string" ? body.activity.trim().slice(0, 80) : "";
         if (!/^[A-Za-z0-9_-]{8,120}$/.test(visitorId) || !/^[A-Za-z0-9_-]{8,120}$/.test(sessionId)) return res.status(400).json({ error: "Invalid visitor or session ID" });
         const isGuest = decodedToken?.firebase?.sign_in_provider === "anonymous";
         let account = null;
@@ -145,7 +145,7 @@ export default async function handler(req, res) {
                 webgl: { supported: typeof webgl.supported === "boolean" ? webgl.supported : false, renderer: shortText(webgl.renderer, 120) }
             };
         }
-        const update = { visitorId, ip, page, lastSessionId: sessionId, lastSeen: now, visitCount: previous.exists ? (Number(previousData.visitCount) || 1) + (isNewSession ? 1 : 0) : 1 };
+        const update = { visitorId, ip, page, lastSessionId: sessionId, lastSeen: now, visitCount: previous.exists ? (Number(previousData.visitCount) || 1) + (isNewSession ? 1 : 0) : 1 };\n        if (activity) {\n            const activities = Array.isArray(previousData.recentActivities) ? previousData.recentActivities.slice(-29) : [];\n            activities.push({ label: activity, at: new Date().toISOString() });\n            update.recentActivities = activities.slice(-30);\n        }
         if (device) {
             const priorDevice = previousData.device || null;
             const deviceKey = value => JSON.stringify(value ? {
