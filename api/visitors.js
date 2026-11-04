@@ -148,7 +148,11 @@ export default async function handler(req, res) {
             };
         }
         const update = { visitorId, ip, page, lastSessionId: sessionId, lastSeen: now, visitCount: previous.exists ? (Number(previousData.visitCount) || 1) + (isNewSession ? 1 : 0) : 1 };
-        if (activity) {\n            const activities = Array.isArray(previousData.recentActivities) ? previousData.recentActivities.slice(-29) : [];\n            activities.push({ label: activity, at: new Date().toISOString() });\n            update.recentActivities = activities.slice(-30);\n        }
+        if (activity) {
+            const activities = Array.isArray(previousData.recentActivities) ? previousData.recentActivities.slice(-29) : [];
+            activities.push({ label: activity, at: new Date().toISOString() });
+            update.recentActivities = activities.slice(-30);
+        }
         if (device) {
             const priorDevice = previousData.device || null;
             const deviceKey = value => JSON.stringify(value ? {
