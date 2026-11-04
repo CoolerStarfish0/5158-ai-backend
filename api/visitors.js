@@ -83,7 +83,8 @@ export default async function handler(req, res) {
                     firstSeen: toIso(data.firstSeen),
                     lastSeen: toIso(data.lastSeen),
                     device: data.device || null,
-                    deviceHistory: Array.isArray(data.deviceHistory) ? data.deviceHistory.slice(-10) : [],\n                    recentActivities: Array.isArray(data.recentActivities) ? data.recentActivities.slice(-30) : []
+                    deviceHistory: Array.isArray(data.deviceHistory) ? data.deviceHistory.slice(-10) : [],
+                    recentActivities: Array.isArray(data.recentActivities) ? data.recentActivities.slice(-30) : []
                 };
             });
             return res.status(200).json({ visitors });
