@@ -1,3 +1,4 @@
+import { getLocalAIConfig } from "../../../lib/local-ai-config.js";
 const ALLOWED_ORIGIN = "https://coolerstarfish0.github.io";
 
 function cors(res) {
@@ -23,8 +24,7 @@ export default async function handler(req, res) {
     const firebaseToken = String(req.headers.authorization || "").slice(7).trim();
     if (!firebaseToken) return res.status(401).json({ error: "Authentication token required" });
 
-    const localAIUrl = process.env.LOCAL_AI_URL;
-    const localAISecret = process.env.LOCAL_AI_SECRET;
+    const { localAIUrl, localAISecret } = await getLocalAIConfig();
     if (!localAIUrl || !localAISecret) {
       return res.status(500).json({ error: "Local AI configuration is missing" });
     }
