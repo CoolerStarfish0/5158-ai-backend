@@ -1,3 +1,4 @@
+import { getLocalAIConfig } from "../../lib/local-ai-config.js";
 export default async function handler(req, res) {
     // ==========================================
     // CORS
@@ -118,11 +119,7 @@ export default async function handler(req, res) {
         // LOCAL AI SETTINGS
         // ==========================================
 
-        const localAIUrl =
-            process.env.LOCAL_AI_URL;
-
-        const localAISecret =
-            process.env.LOCAL_AI_SECRET;
+        const { localAIUrl, localAISecret } = await getLocalAIConfig();
 
         if (!localAIUrl || !localAISecret) {
             console.error(
