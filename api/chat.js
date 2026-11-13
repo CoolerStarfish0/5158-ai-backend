@@ -394,11 +394,7 @@ export default async function handler(req, res) {
         // ENVIRONMENT VARIABLES
         // ==========================================
 
-        const localAIUrl =
-            process.env.LOCAL_AI_URL;
-
-        const localAISecret =
-            process.env.LOCAL_AI_SECRET;
+        const { localAIUrl, localAISecret } = await (await import("../lib/local-ai-config.js")).getLocalAIConfig();
 
         if (!localAIUrl || !localAISecret) {
             console.error(
