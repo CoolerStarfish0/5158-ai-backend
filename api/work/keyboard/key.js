@@ -67,8 +67,8 @@ module.exports = async (req, res) => {
       });
     }
 
-    const localAIUrl = process.env.LOCAL_AI_URL;
-    const localAISecret = process.env.LOCAL_AI_SECRET;
+    const { getLocalAIConfig } = await import("../../../lib/local-ai-config.js");
+    const { localAIUrl, localAISecret } = await getLocalAIConfig();
 
     if (!localAIUrl || !localAISecret) {
       return res.status(500).json({
