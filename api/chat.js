@@ -161,7 +161,10 @@ export default async function handler(req, res) {
 
     const allowedOrigins = new Set([
         "https://coolerstarfish0.github.io",
-        "https://skyprofit-7j5snzxa0-cooler-starfish0.vercel.app"
+        "https://skyprofit-cooler-starfish0.vercel.app",
+        "https://skyprofit-git-main-cooler-starfish0.vercel.app",
+        "https://skyprofit-7j5snzxa0-cooler-starfish0.vercel.app",
+        "https://skyprofit-eetiywpyb-cooler-starfish0.vercel.app"
     ]);
     const requestOrigin = req.headers.origin;
     if (requestOrigin && allowedOrigins.has(requestOrigin)) {
